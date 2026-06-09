@@ -1,0 +1,54 @@
+name: CI - Build, Push e GitOps bump
+
+# Roda só quando o código da app muda (ou o próprio workflow).
+# Importante: NÃO inclui manifests/** para evitar loop infinito quando o
+# próprio CI commita a nova tag de imagem de volta no repositório.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "app/**"
+      - ".github/workflows/ci.yml"
+
+permissions:
+  contents: write # para commitar o bump da imagem
+  packages: write # para publicar a imagem no GHCR
+
+env:
+  IMAGE: ghcr.io/dudainfinity/gitops-argocd-pipeline
+
+jobs:
+  build-and-update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Login no GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build e push da imagem
+        uses: docker/build-push-action@v6
+        with:
+          context: ./app
+          push: true
+          tags: |
+            ${{ env.IMAGE }}:${{ github.sha }}
+            ${{ env.IMAGE }}:latest
+
+      - name: Atualiza a tag da imagem nos manifests (GitOps)
+        run: |
+          sed -i "s|newTag:.*|newTag: ${{ github.sha }}|" manifests/kustomization.yaml
+          echo "Nova tag de imagem: ${{ github.sha }}"
+
+      - name: Commit e push do novo estado desejado
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add manifests/kustomization.yaml
+          git diff --cached --quiet || git commit -m "ci: bump imagem para ${{ github.sha }} [skip ci]"
+          git push

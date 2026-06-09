@@ -1,0 +1,25 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: gitops-app
+  namespace: argocd
+spec:
+  project: default
+
+  # De onde o ArgoCD lê o estado desejado (este repositório, pasta manifests).
+  source:
+    repoURL: https://github.com/Dudainfinity/gitops-argocd-pipeline
+    targetRevision: main
+    path: manifests
+
+  # Onde aplicar (cluster local + namespace demo).
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: demo
+
+  syncPolicy:
+    automated:
+      prune: true      # remove recursos que saíram do Git
+      selfHeal: true   # desfaz mudanças manuais feitas direto no cluster
+    syncOptions:
+      - CreateNamespace=true

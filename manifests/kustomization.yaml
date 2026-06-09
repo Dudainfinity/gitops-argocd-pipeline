@@ -1,0 +1,13 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - deployment.yaml
+  - service.yaml
+
+# O Kustomize troca a imagem "app" pela imagem publicada no GHCR.
+# O CI atualiza o campo newTag a cada push na branch main.
+images:
+  - name: app
+    newName: ghcr.io/dudainfinity/gitops-argocd-pipeline
+    newTag: latest
